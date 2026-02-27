@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -16,24 +17,44 @@ const QUICK_OPTIONS = [
 ];
 
 const PLANES = [
-  { plan: 'Personal', precio: '$599', desc: 'Persona física, RESICO, freelancer, plataformas digitales', color: '#111', border: '#2a2a2a' },
-  { plan: 'PyME', precio: '$1,999', desc: 'Empresa constituida, deducciones avanzadas, estrategia fiscal activa', color: '#001a14', border: '#00d4aa' },
+  { plan: 'Personal', precio: '$599', desc: 'Chat ilimitado, copiloto de declaración, recordatorios mensuales y estrategia fiscal personalizada', color: '#111', border: '#2a2a2a' },
+  { plan: 'PyME', precio: '$1,999', desc: 'Todo lo anterior + deducciones avanzadas, estrategia fiscal activa y análisis financiero mensual', color: '#001a14', border: '#00d4aa' },
   { plan: 'PyME Pro', precio: '$3,999', desc: 'Todo lo anterior + proyección de impuestos anual y análisis financiero mensual personalizado', color: '#0a0a1a', border: '#4466ff' },
 ];
 
 type Message = { role: 'user' | 'assistant'; content: string };
-type View = 'home' | 'chat' | 'declaracion' | 'planes';
+type View = 'home' | 'chat' | 'copiloto' | 'planes';
+
+const PAYWALL = `━━━━━━━━━━━━━━━━━━
+🔒 Función exclusiva para suscriptores
+
+Para continuar con el copiloto de declaración en tiempo real necesitas el plan Personal.
+
+✅ Copiloto ilimitado
+✅ Chat fiscal sin límites  
+✅ Recordatorio mensual antes del vencimiento
+✅ Estrategia fiscal personalizada cada mes
+
+Todo por $599/mes — menos que una multa del SAT.
+
+👉 Escríbenos a contacto@satstuto.mx para suscribirte.
+━━━━━━━━━━━━━━━━━━`;
 
 export default function SATstuto() {
   const [view, setView] = useState<View>('home');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [copilotoMessages, setCopilotoMessages] = useState<Message[]>([]);
+  const [copilotoCount, setCopilotoCount] = useState(0);
   const [input, setInput] = useState('');
+  const [copilotoInput, setCopilotoInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copilotoLoading, setCopilotoLoading] = useState(false);
+  const [copilotoStarted, setCopilotoStarted] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const copilotoBottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+  useEffect(() => { copilotoBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [copilotoMessages, copilotoLoading]);
 
   const sendMessage = async (userText: string) => {
     if (!userText.trim() || loading) return;
@@ -41,7 +62,6 @@ export default function SATstuto() {
     setMessages(newMessages);
     setInput('');
     setLoading(true);
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -56,11 +76,56 @@ export default function SATstuto() {
     setLoading(false);
   };
 
+  const sendCopiloto = async (userText: string) => {
+    if (!userText.trim() || copilotoLoading) return;
+    if (copilotoCount >= 3) {
+      setCopilotoMessages(prev => [...prev, { role: 'user', content: userText }, { role: 'assistant', content: PAYWALL }]);
+      setCopilotoInput('');
+      return;
+    }
+    const newMessages: Message[] = [...copilotoMessages, { role: 'user', content: userText }];
+    setCopilotoMessages(newMessages);
+    setCopilotoInput('');
+    setCopilotoLoading(true);
+    setCopilotoCount(prev => prev + 1);
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          system: 'Eres el copiloto de declaración de SATstuto. El usuario tiene el portal SAT abierto en otra ventana. Guíalo paso a paso en tiempo real. Pregunta qué ve en pantalla. Sé muy específico: dile exactamente dónde hacer clic, qué número capturar, qué opción seleccionar. Máximo 3 pasos por mensaje para no abrumarlo.'
+        }),
+      });
+      const data = await res.json();
+      const reply = data.reply || 'Error al obtener respuesta.';
+      const updatedMessages = [...newMessages, { role: 'assistant' as const, content: reply }];
+      setCopilotoMessages(updatedMessages);
+      if (copilotoCount + 1 >= 3) {
+        setTimeout(() => {
+          setCopilotoMessages(prev => [...prev, { role: 'assistant', content: PAYWALL }]);
+        }, 1500);
+      }
+    } catch {
+      setCopilotoMessages(prev => [...prev, { role: 'assistant', content: 'Error de conexión. Intenta de nuevo.' }]);
+    }
+    setCopilotoLoading(false);
+  };
+
   const startWith = (text: string) => { setView('chat'); sendMessage(text); };
+
+  const startCopiloto = () => {
+    setCopilotoStarted(true);
+    const initialMsg: Message = {
+      role: 'assistant',
+      content: '¡Listo! Vamos a declarar juntos. 🎯\n\nPrimero dime:\n1. ¿Qué tipo de declaración vas a presentar? (mensual, anual, complementaria)\n2. ¿Ya tienes el portal SAT abierto en otra ventana?\n\nTe guío paso a paso desde donde estés.'
+    };
+    setCopilotoMessages([initialMsg]);
+  };
 
   const NAV = (
     <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #1a1a1a' }}>
-      {(['home', 'chat', 'declaracion', 'planes'] as View[]).map((v, i) => {
+      {(['home', 'chat', 'copiloto', 'planes'] as View[]).map((v, i) => {
         const icons = ['🏠', '💬', '📋', '🔔'];
         return (
           <button key={v} onClick={() => setView(v)} style={{
@@ -77,11 +142,35 @@ export default function SATstuto() {
     </div>
   );
 
+  const ChatBubble = ({ m }: { m: Message }) => (
+    <div style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+      <div style={{
+        maxWidth: '85%',
+        background: m.role === 'user' ? '#00d4aa' : '#111',
+        color: m.role === 'user' ? '#000' : '#ddd',
+        border: m.role === 'assistant' ? '1px solid #1e1e1e' : 'none',
+        borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
+        padding: '12px 16px', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap',
+      }}>
+        {m.content}
+      </div>
+    </div>
+  );
+
+  const LoadingDots = () => (
+    <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+      <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: '4px 16px 16px 16px', padding: '14px 18px', display: 'flex', gap: '5px' }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00d4aa', animation: `blink 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: '#0a0a0a', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px' }}>
       <div style={{ width: '100%', maxWidth: '580px' }}>
 
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#111', border: '1px solid #1e1e1e', borderRadius: '20px', padding: '6px 16px', marginBottom: '12px' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00d4aa' }} />
@@ -120,7 +209,7 @@ export default function SATstuto() {
           </div>
         )}
 
-        {/* CHAT */}
+        {/* CHAT LIBRE */}
         {view === 'chat' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '70vh' }}>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '8px' }}>
@@ -129,29 +218,8 @@ export default function SATstuto() {
                   Describe tu situación fiscal y te doy estrategia concreta.
                 </div>
               )}
-              {messages.map((m, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  <div style={{
-                    maxWidth: '85%',
-                    background: m.role === 'user' ? '#00d4aa' : '#111',
-                    color: m.role === 'user' ? '#000' : '#ddd',
-                    border: m.role === 'assistant' ? '1px solid #1e1e1e' : 'none',
-                    borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
-                    padding: '12px 16px', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap',
-                  }}>
-                    {m.content}
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: '4px 16px 16px 16px', padding: '14px 18px', display: 'flex', gap: '5px' }}>
-                    {[0, 1, 2].map(i => (
-                      <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00d4aa', animation: `blink 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {messages.map((m, i) => <ChatBubble key={i} m={m} />)}
+              {loading && <LoadingDots />}
               <div ref={bottomRef} />
             </div>
             <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid #1a1a1a' }}>
@@ -170,21 +238,73 @@ export default function SATstuto() {
           </div>
         )}
 
-        {/* DECLARACION */}
-        {view === 'declaracion' && (
+        {/* COPILOTO */}
+        {view === 'copiloto' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '70vh' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ color: '#fff', fontSize: '16px', fontWeight: 700, margin: '0 0 4px' }}>Copiloto de Declaración</h2>
-              <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>Abre el portal SAT en otra ventana. Yo te guío paso a paso en tiempo real.</p>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '8px' }}>
-              {messages.filter(m => m.role === 'assistant' || m.role === 'user').length === 0 && (
-                <button onClick={() => { setView('chat'); sendMessage('Quiero declarar ahora mismo. Acompáñame paso a paso en el portal SAT. Ya tengo el portal abierto.'); }}
-                  style={{ background: '#00d4aa', color: '#000', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', marginTop: '20px' }}>
-                  Iniciar copiloto de declaración →
+            {!copilotoStarted ? (
+              <div style={{ textAlign: 'center', paddingTop: '40px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: 700, margin: '0 0 8px' }}>Copiloto de Declaración</h2>
+                <p style={{ color: '#888', fontSize: '13px', lineHeight: '1.6', marginBottom: '24px' }}>
+                  Abre el portal SAT en otra ventana.<br />Yo te guío paso a paso en tiempo real.
+                </p>
+                <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '16px', marginBottom: '24px', textAlign: 'left' }}>
+                  <div style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>PRUEBA GRATIS — 3 intercambios</div>
+                  <div style={{ color: '#888', fontSize: '12px', lineHeight: '1.6' }}>
+                    Experimenta cómo funciona el copiloto. Para declaraciones completas sin límite, suscríbete al plan Personal.
+                  </div>
+                </div>
+                <button onClick={startCopiloto} style={{
+                  width: '100%', background: '#00d4aa', color: '#000',
+                  border: 'none', borderRadius: '10px', padding: '14px',
+                  fontSize: '15px', fontWeight: 700, cursor: 'pointer',
+                }}>
+                  Iniciar copiloto gratuito →
                 </button>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ color: '#888', fontSize: '12px' }}>Copiloto activo</span>
+                  {copilotoCount < 3 && (
+                    <span style={{ color: '#00d4aa', fontSize: '12px', background: '#001a14', border: '1px solid #00d4aa', borderRadius: '20px', padding: '2px 10px' }}>
+                      {3 - copilotoCount} intercambios gratis restantes
+                    </span>
+                  )}
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '8px' }}>
+                  {copilotoMessages.map((m, i) => <ChatBubble key={i} m={m} />)}
+                  {copilotoLoading && <LoadingDots />}
+                  <div ref={copilotoBottomRef} />
+                </div>
+                {copilotoCount < 3 && (
+                  <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid #1a1a1a' }}>
+                    <input value={copilotoInput} onChange={e => setCopilotoInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendCopiloto(copilotoInput)}
+                      placeholder="¿Qué ves en pantalla?"
+                      style={{ flex: 1, background: '#111', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '12px 16px', color: '#fff', fontSize: '14px', outline: 'none' }}
+                    />
+                    <button onClick={() => sendCopiloto(copilotoInput)} disabled={copilotoLoading || !copilotoInput.trim()} style={{
+                      background: !copilotoLoading && copilotoInput.trim() ? '#00d4aa' : '#1a1a1a',
+                      color: !copilotoLoading && copilotoInput.trim() ? '#000' : '#333',
+                      border: 'none', borderRadius: '10px', padding: '12px 20px',
+                      fontSize: '18px', fontWeight: 700, cursor: !copilotoLoading && copilotoInput.trim() ? 'pointer' : 'default',
+                    }}>→</button>
+                  </div>
+                )}
+                {copilotoCount >= 3 && (
+                  <div style={{ paddingTop: '12px', borderTop: '1px solid #1a1a1a', textAlign: 'center' }}>
+                    <a href="mailto:contacto@satstuto.mx" style={{
+                      display: 'block', background: '#00d4aa', color: '#000',
+                      borderRadius: '10px', padding: '14px', fontSize: '14px',
+                      fontWeight: 700, textDecoration: 'none',
+                    }}>
+                      Suscribirme al Plan Personal — $599/mes →
+                    </a>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -214,21 +334,25 @@ export default function SATstuto() {
                 <div key={p.plan} style={{ background: p.color, border: '1px solid ' + p.border, borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ color: '#888', fontSize: '11px', letterSpacing: '1px', marginBottom: '4px' }}>{p.plan.toUpperCase()}</div>
-                    <div style={{ color: '#aaa', fontSize: '12px', maxWidth: '260px', lineHeight: '1.4' }}>{p.desc}</div>
+                    <div style={{ color: '#aaa', fontSize: '12px', maxWidth: '240px', lineHeight: '1.4' }}>{p.desc}</div>
                   </div>
-                  <div style={{ color: '#fff', fontSize: '22px', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                  <div style={{ color: '#fff', fontSize: '22px', fontWeight: 800, whiteSpace: 'nowrap', marginLeft: '12px' }}>
                     {p.precio}<span style={{ fontSize: '11px', fontWeight: 400, color: '#555' }}>/mes</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            <button style={{ width: '100%', background: '#00d4aa', color: '#000', border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginTop: '14px' }}>
+            <a href="mailto:contacto@satstuto.mx" style={{
+              display: 'block', width: '100%', background: '#00d4aa', color: '#000',
+              border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px',
+              fontWeight: 700, cursor: 'pointer', marginTop: '14px', textAlign: 'center', textDecoration: 'none',
+            }}>
               Quiero que el SAT no me sorprenda →
-            </button>
+            </a>
 
             <div style={{ textAlign: 'center', marginTop: '12px' }}>
-              <span style={{ color: '#222', fontSize: '10px' }}>Orientación informativa. No sustituye asesoría profesional certificada.</span>
+              <span style={{ color: '#444', fontSize: '11px' }}>Orientación fiscal con alta precisión. Para casos complejos, complementa con validación profesional.</span>
             </div>
           </div>
         )}
