@@ -63,12 +63,18 @@ export default function SATstuto() {
   const [copilotoLoading, setCopilotoLoading] = useState(false);
   const [copilotoStarted, setCopilotoStarted] = useState(false);
   const [selectedTramite, setSelectedTramite] = useState('');
+  const [otroTramiteMode, setOtroTramiteMode] = useState(false);
+  const [otroTramiteInput, setOtroTramiteInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const copilotoBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const otroInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
   useEffect(() => { copilotoBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [copilotoMessages, copilotoLoading]);
+  useEffect(() => {
+    if (otroTramiteMode) otroInputRef.current?.focus();
+  }, [otroTramiteMode]);
 
   const sendMessage = async (userText: string) => {
     if (!userText.trim() || loading) return;
@@ -117,7 +123,6 @@ export default function SATstuto() {
     setCopilotoLoading(true);
     setCopilotoCount(prev => prev + 1);
 
-    // Format messages for API — convert images to Anthropic format
     const apiMessages = newMessages.map(m => {
       if (typeof m.content === 'string') return m;
       const content = (m.content as MessageContent[]).map(c => {
@@ -167,6 +172,8 @@ export default function SATstuto() {
   const startCopiloto = (tramite: string) => {
     setSelectedTramite(tramite);
     setCopilotoStarted(true);
+    setOtroTramiteMode(false);
+    setOtroTramiteInput('');
     const initialMsg: Message = {
       role: 'assistant',
       content: `Listo, vamos a hacer tu ${tramite} juntos. 🎯\n\n¿Ya tienes el portal SAT abierto en otra ventana? Si es así dime qué ves en pantalla y te guío paso a paso.\n\nTambién puedes subir una captura 📸 de lo que ves y te digo exactamente qué hacer.`
@@ -311,7 +318,7 @@ export default function SATstuto() {
                     Puedes subir capturas y te digo exactamente qué hacer.
                   </p>
                   <div style={{ background: '#001a14', border: '1px solid #00d4aa', borderRadius: '8px', padding: '10px 14px', display: 'inline-block', marginBottom: '20px' }}>
-                    <span style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600 }}>3 intercambios gratis — sin tarjeta</span>
+                    <span style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600 }}>3 consultas gratis antes de suscribirte</span>
                   </div>
                 </div>
                 <p style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>¿Qué trámite necesitas hacer?</p>
@@ -326,12 +333,62 @@ export default function SATstuto() {
                       {t.text}
                     </button>
                   ))}
+                  {/* Otro trámite */}
+                  {!otroTramiteMode ? (
+                    <button
+                      onClick={() => setOtroTramiteMode(true)}
+                      style={{
+                        background: '#111', border: '1px dashed #333', borderRadius: '10px',
+                        padding: '12px', color: '#666', fontSize: '12px',
+                        cursor: 'pointer', textAlign: 'left', lineHeight: '1.5',
+                        gridColumn: TRAMITES.length % 2 === 0 ? '1 / -1' : 'auto',
+                      }}
+                    >
+                      <span style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>✏️</span>
+                      Otro trámite...
+                    </button>
+                  ) : (
+                    <div style={{
+                      background: '#111', border: '1px solid #00d4aa', borderRadius: '10px',
+                      padding: '12px', gridColumn: '1 / -1',
+                      display: 'flex', gap: '8px', alignItems: 'center',
+                    }}>
+                      <input
+                        ref={otroInputRef}
+                        value={otroTramiteInput}
+                        onChange={e => setOtroTramiteInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && otroTramiteInput.trim()) startCopiloto(otroTramiteInput.trim());
+                          if (e.key === 'Escape') { setOtroTramiteMode(false); setOtroTramiteInput(''); }
+                        }}
+                        placeholder="Describe el trámite que necesitas..."
+                        style={{
+                          flex: 1, background: 'transparent', border: 'none',
+                          color: '#fff', fontSize: '13px', outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={() => otroTramiteInput.trim() && startCopiloto(otroTramiteInput.trim())}
+                        disabled={!otroTramiteInput.trim()}
+                        style={{
+                          background: otroTramiteInput.trim() ? '#00d4aa' : '#1a1a1a',
+                          color: otroTramiteInput.trim() ? '#000' : '#333',
+                          border: 'none', borderRadius: '6px', padding: '6px 12px',
+                          fontSize: '14px', fontWeight: 700, cursor: otroTramiteInput.trim() ? 'pointer' : 'default',
+                        }}
+                      >→</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      onClick={() => { setCopilotoStarted(false); setCopilotoMessages([]); setCopilotoCount(0); setSelectedTramite(''); }}
+                      style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: '16px', padding: '0' }}
+                    >←</button>
                     <span style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>{selectedTramite}</span>
                   </div>
                   {copilotoCount < 3 && (
