@@ -27,9 +27,9 @@ const TRAMITES = [
 ];
 
 const PLANES = [
-  { plan: 'Personal', precio: '$599', desc: 'Chat ilimitado, copiloto de declaración, recordatorios mensuales y estrategia fiscal personalizada', color: '#111', border: '#2a2a2a' },
-  { plan: 'PyME', precio: '$1,999', desc: 'Todo lo anterior + deducciones avanzadas, estrategia fiscal activa y análisis financiero mensual', color: '#001a14', border: '#00d4aa' },
-  { plan: 'PyME Pro', precio: '$3,999', desc: 'Todo lo anterior + proyección de impuestos anual y análisis financiero mensual personalizado', color: '#0a0a1a', border: '#4466ff' },
+  { plan: 'Personal', precio: '$399', desc: 'Chat ilimitado, copiloto personal en cualquier trámite fiscal, recordatorios mensuales y estrategia fiscal personalizada', color: '#111', border: '#2a2a2a' },
+  { plan: 'PyME', precio: '$1,299', desc: 'Todo lo anterior + deducciones avanzadas, estrategia fiscal activa y análisis financiero mensual', color: '#001a14', border: '#00d4aa' },
+  { plan: 'PyME Pro', precio: '$2,499', desc: 'Todo lo anterior + proyección de impuestos anual y análisis financiero mensual personalizado', color: '#0a0a1a', border: '#4466ff' },
 ];
 
 type MessageContent = { type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string };
@@ -47,7 +47,7 @@ Para continuar con el copiloto en tiempo real necesitas el plan Personal.
 ✅ Recordatorio mensual antes del vencimiento
 ✅ Estrategia fiscal personalizada cada mes
 
-Todo por $599/mes — menos que una multa del SAT.
+Todo por $399/mes — menos que una multa del SAT.
 
 👉 Escríbenos a contacto@satstuto.mx para suscribirte.
 ━━━━━━━━━━━━━━━━━━`;
@@ -86,7 +86,7 @@ export default function SATstuto() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMessages, mode: 'chat' }),
       });
       const data = await res.json();
       setMessages([...newMessages, { role: 'assistant', content: data.reply || 'Error al obtener respuesta.' }]);
@@ -138,7 +138,7 @@ export default function SATstuto() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ messages: apiMessages, mode: 'copiloto' }),
       });
       const data = await res.json();
       const reply = data.reply || 'Error al obtener respuesta.';
@@ -433,7 +433,7 @@ export default function SATstuto() {
                       borderRadius: '10px', padding: '14px', fontSize: '14px',
                       fontWeight: 700, textDecoration: 'none', textAlign: 'center',
                     }}>
-                      Suscribirme al Plan Personal — $599/mes →
+                      Suscribirme al Plan Personal — $399/mes →
                     </a>
                   </div>
                 )}
