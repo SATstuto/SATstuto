@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -16,22 +15,35 @@ const QUICK_OPTIONS = [
   { icon: '📋', text: 'Quiero declarar ahora mismo. Acompáñame paso a paso.' },
 ];
 
+const TRAMITES = [
+  { icon: '📄', text: 'Declaración mensual' },
+  { icon: '📅', text: 'Declaración anual 2025' },
+  { icon: '🪪', text: 'Constancia de situación fiscal' },
+  { icon: '✅', text: 'Opinión de cumplimiento' },
+  { icon: '🔄', text: 'Actualización de obligaciones' },
+  { icon: '🔁', text: 'Cambio de régimen fiscal' },
+  { icon: '📬', text: 'Buzón tributario' },
+  { icon: '🆕', text: 'Tramitar RFC por primera vez' },
+];
+
 const PLANES = [
   { plan: 'Personal', precio: '$599', desc: 'Chat ilimitado, copiloto de declaración, recordatorios mensuales y estrategia fiscal personalizada', color: '#111', border: '#2a2a2a' },
   { plan: 'PyME', precio: '$1,999', desc: 'Todo lo anterior + deducciones avanzadas, estrategia fiscal activa y análisis financiero mensual', color: '#001a14', border: '#00d4aa' },
   { plan: 'PyME Pro', precio: '$3,999', desc: 'Todo lo anterior + proyección de impuestos anual y análisis financiero mensual personalizado', color: '#0a0a1a', border: '#4466ff' },
 ];
 
-type Message = { role: 'user' | 'assistant'; content: string };
+type MessageContent = { type: 'text'; text: string } | { type: 'image'; data: string; mediaType: string };
+type Message = { role: 'user' | 'assistant'; content: string | MessageContent[] };
 type View = 'home' | 'chat' | 'copiloto' | 'planes';
 
 const PAYWALL = `━━━━━━━━━━━━━━━━━━
 🔒 Función exclusiva para suscriptores
 
-Para continuar con el copiloto de declaración en tiempo real necesitas el plan Personal.
+Para continuar con el copiloto en tiempo real necesitas el plan Personal.
 
-✅ Copiloto ilimitado
-✅ Chat fiscal sin límites  
+✅ Copiloto ilimitado con análisis de capturas
+✅ Todos los trámites SAT guiados
+✅ Chat fiscal sin límites
 ✅ Recordatorio mensual antes del vencimiento
 ✅ Estrategia fiscal personalizada cada mes
 
@@ -50,8 +62,10 @@ export default function SATstuto() {
   const [loading, setLoading] = useState(false);
   const [copilotoLoading, setCopilotoLoading] = useState(false);
   const [copilotoStarted, setCopilotoStarted] = useState(false);
+  const [selectedTramite, setSelectedTramite] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const copilotoBottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
   useEffect(() => { copilotoBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [copilotoMessages, copilotoLoading]);
@@ -76,31 +90,55 @@ export default function SATstuto() {
     setLoading(false);
   };
 
-  const sendCopiloto = async (userText: string) => {
-    if (!userText.trim() || copilotoLoading) return;
+  const sendCopiloto = async (userText: string, imageData?: { data: string; mediaType: string }) => {
+    if ((!userText.trim() && !imageData) || copilotoLoading) return;
     if (copilotoCount >= 3) {
-      setCopilotoMessages(prev => [...prev, { role: 'user', content: userText }, { role: 'assistant', content: PAYWALL }]);
+      setCopilotoMessages(prev => [...prev,
+        { role: 'user', content: userText || '📸 Captura enviada' },
+        { role: 'assistant', content: PAYWALL }
+      ]);
       setCopilotoInput('');
       return;
     }
-    const newMessages: Message[] = [...copilotoMessages, { role: 'user', content: userText }];
+
+    let userContent: string | MessageContent[];
+    if (imageData) {
+      userContent = [
+        { type: 'image', data: imageData.data, mediaType: imageData.mediaType },
+        { type: 'text', text: userText || 'Analiza esta captura y dime qué debo hacer.' },
+      ];
+    } else {
+      userContent = userText;
+    }
+
+    const newMessages: Message[] = [...copilotoMessages, { role: 'user', content: userContent }];
     setCopilotoMessages(newMessages);
     setCopilotoInput('');
     setCopilotoLoading(true);
     setCopilotoCount(prev => prev + 1);
+
+    // Format messages for API — convert images to Anthropic format
+    const apiMessages = newMessages.map(m => {
+      if (typeof m.content === 'string') return m;
+      const content = (m.content as MessageContent[]).map(c => {
+        if (c.type === 'image') {
+          return { type: 'image', source: { type: 'base64', media_type: c.mediaType, data: c.data } };
+        }
+        return c;
+      });
+      return { role: m.role, content };
+    });
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newMessages,
-          system: 'Eres el copiloto de declaración de SATstuto. El usuario tiene el portal SAT abierto en otra ventana. Guíalo paso a paso en tiempo real. Pregunta qué ve en pantalla. Sé muy específico: dile exactamente dónde hacer clic, qué número capturar, qué opción seleccionar. Máximo 3 pasos por mensaje para no abrumarlo.'
-        }),
+        body: JSON.stringify({ messages: apiMessages }),
       });
       const data = await res.json();
       const reply = data.reply || 'Error al obtener respuesta.';
-      const updatedMessages = [...newMessages, { role: 'assistant' as const, content: reply }];
-      setCopilotoMessages(updatedMessages);
+      const updated: Message[] = [...newMessages, { role: 'assistant', content: reply }];
+      setCopilotoMessages(updated);
       if (copilotoCount + 1 >= 3) {
         setTimeout(() => {
           setCopilotoMessages(prev => [...prev, { role: 'assistant', content: PAYWALL }]);
@@ -112,13 +150,26 @@ export default function SATstuto() {
     setCopilotoLoading(false);
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      sendCopiloto(copilotoInput || 'Analiza esta captura del portal SAT y dime qué debo hacer.', { data: base64, mediaType: file.type });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const startWith = (text: string) => { setView('chat'); sendMessage(text); };
 
-  const startCopiloto = () => {
+  const startCopiloto = (tramite: string) => {
+    setSelectedTramite(tramite);
     setCopilotoStarted(true);
     const initialMsg: Message = {
       role: 'assistant',
-      content: '¡Listo! Vamos a declarar juntos. 🎯\n\nPrimero dime:\n1. ¿Qué tipo de declaración vas a presentar? (mensual, anual, complementaria)\n2. ¿Ya tienes el portal SAT abierto en otra ventana?\n\nTe guío paso a paso desde donde estés.'
+      content: `Listo, vamos a hacer tu ${tramite} juntos. 🎯\n\n¿Ya tienes el portal SAT abierto en otra ventana? Si es así dime qué ves en pantalla y te guío paso a paso.\n\nTambién puedes subir una captura 📸 de lo que ves y te digo exactamente qué hacer.`
     };
     setCopilotoMessages([initialMsg]);
   };
@@ -142,6 +193,15 @@ export default function SATstuto() {
     </div>
   );
 
+  const renderContent = (content: string | MessageContent[]) => {
+    if (typeof content === 'string') return content;
+    return content.map((c, i) => {
+      if (c.type === 'text') return <span key={i}>{c.text}</span>;
+      if (c.type === 'image') return <img key={i} src={`data:${c.mediaType};base64,${c.data}`} style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '8px' }} alt="captura" />;
+      return null;
+    });
+  };
+
   const ChatBubble = ({ m }: { m: Message }) => (
     <div style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
       <div style={{
@@ -152,7 +212,7 @@ export default function SATstuto() {
         borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
         padding: '12px 16px', fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap',
       }}>
-        {m.content}
+        {renderContent(m.content)}
       </div>
     </div>
   );
@@ -242,33 +302,41 @@ export default function SATstuto() {
         {view === 'copiloto' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '70vh' }}>
             {!copilotoStarted ? (
-              <div style={{ textAlign: 'center', paddingTop: '40px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
-                <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: 700, margin: '0 0 8px' }}>Copiloto de Declaración</h2>
-                <p style={{ color: '#888', fontSize: '13px', lineHeight: '1.6', marginBottom: '24px' }}>
-                  Abre el portal SAT en otra ventana.<br />Yo te guío paso a paso en tiempo real.
-                </p>
-                <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '16px', marginBottom: '24px', textAlign: 'left' }}>
-                  <div style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>PRUEBA GRATIS — 3 intercambios</div>
-                  <div style={{ color: '#888', fontSize: '12px', lineHeight: '1.6' }}>
-                    Experimenta cómo funciona el copiloto. Para declaraciones completas sin límite, suscríbete al plan Personal.
+              <div style={{ overflowY: 'auto' }}>
+                <div style={{ textAlign: 'center', paddingTop: '16px', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
+                  <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: 700, margin: '0 0 6px' }}>Copiloto SAT</h2>
+                  <p style={{ color: '#888', fontSize: '13px', lineHeight: '1.6', margin: '0 0 8px' }}>
+                    Te guío en tiempo real en cualquier trámite del portal SAT.<br />
+                    Puedes subir capturas y te digo exactamente qué hacer.
+                  </p>
+                  <div style={{ background: '#001a14', border: '1px solid #00d4aa', borderRadius: '8px', padding: '10px 14px', display: 'inline-block', marginBottom: '20px' }}>
+                    <span style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600 }}>3 intercambios gratis — sin tarjeta</span>
                   </div>
                 </div>
-                <button onClick={startCopiloto} style={{
-                  width: '100%', background: '#00d4aa', color: '#000',
-                  border: 'none', borderRadius: '10px', padding: '14px',
-                  fontSize: '15px', fontWeight: 700, cursor: 'pointer',
-                }}>
-                  Iniciar copiloto gratuito →
-                </button>
+                <p style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>¿Qué trámite necesitas hacer?</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {TRAMITES.map((t) => (
+                    <button key={t.text} onClick={() => startCopiloto(t.text)} style={{
+                      background: '#111', border: '1px solid #1e1e1e', borderRadius: '10px',
+                      padding: '12px', color: '#ccc', fontSize: '12px',
+                      cursor: 'pointer', textAlign: 'left', lineHeight: '1.5',
+                    }}>
+                      <span style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>{t.icon}</span>
+                      {t.text}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ color: '#888', fontSize: '12px' }}>Copiloto activo</span>
+                  <div>
+                    <span style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>{selectedTramite}</span>
+                  </div>
                   {copilotoCount < 3 && (
-                    <span style={{ color: '#00d4aa', fontSize: '12px', background: '#001a14', border: '1px solid #00d4aa', borderRadius: '20px', padding: '2px 10px' }}>
-                      {3 - copilotoCount} intercambios gratis restantes
+                    <span style={{ color: '#00d4aa', fontSize: '11px', background: '#001a14', border: '1px solid #00d4aa', borderRadius: '20px', padding: '2px 10px' }}>
+                      {3 - copilotoCount} gratis restantes
                     </span>
                   )}
                 </div>
@@ -277,27 +345,36 @@ export default function SATstuto() {
                   {copilotoLoading && <LoadingDots />}
                   <div ref={copilotoBottomRef} />
                 </div>
-                {copilotoCount < 3 && (
-                  <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid #1a1a1a' }}>
-                    <input value={copilotoInput} onChange={e => setCopilotoInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendCopiloto(copilotoInput)}
-                      placeholder="¿Qué ves en pantalla?"
-                      style={{ flex: 1, background: '#111', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '12px 16px', color: '#fff', fontSize: '14px', outline: 'none' }}
-                    />
-                    <button onClick={() => sendCopiloto(copilotoInput)} disabled={copilotoLoading || !copilotoInput.trim()} style={{
-                      background: !copilotoLoading && copilotoInput.trim() ? '#00d4aa' : '#1a1a1a',
-                      color: !copilotoLoading && copilotoInput.trim() ? '#000' : '#333',
-                      border: 'none', borderRadius: '10px', padding: '12px 20px',
-                      fontSize: '18px', fontWeight: 700, cursor: !copilotoLoading && copilotoInput.trim() ? 'pointer' : 'default',
-                    }}>→</button>
+                {copilotoCount < 3 ? (
+                  <div style={{ paddingTop: '12px', borderTop: '1px solid #1a1a1a' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <input value={copilotoInput} onChange={e => setCopilotoInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendCopiloto(copilotoInput)}
+                        placeholder="¿Qué ves en pantalla?"
+                        style={{ flex: 1, background: '#111', border: '1px solid #1e1e1e', borderRadius: '10px', padding: '12px 16px', color: '#fff', fontSize: '14px', outline: 'none' }}
+                      />
+                      <button onClick={() => sendCopiloto(copilotoInput)} disabled={copilotoLoading || !copilotoInput.trim()} style={{
+                        background: !copilotoLoading && copilotoInput.trim() ? '#00d4aa' : '#1a1a1a',
+                        color: !copilotoLoading && copilotoInput.trim() ? '#000' : '#333',
+                        border: 'none', borderRadius: '10px', padding: '12px 20px',
+                        fontSize: '18px', fontWeight: 700, cursor: !copilotoLoading && copilotoInput.trim() ? 'pointer' : 'default',
+                      }}>→</button>
+                    </div>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                    <button onClick={() => fileInputRef.current?.click()} style={{
+                      width: '100%', background: '#111', border: '1px dashed #333',
+                      borderRadius: '10px', padding: '10px', color: '#666',
+                      fontSize: '12px', cursor: 'pointer',
+                    }}>
+                      📸 Subir captura del portal SAT
+                    </button>
                   </div>
-                )}
-                {copilotoCount >= 3 && (
-                  <div style={{ paddingTop: '12px', borderTop: '1px solid #1a1a1a', textAlign: 'center' }}>
+                ) : (
+                  <div style={{ paddingTop: '12px', borderTop: '1px solid #1a1a1a' }}>
                     <a href="mailto:contacto@satstuto.mx" style={{
                       display: 'block', background: '#00d4aa', color: '#000',
                       borderRadius: '10px', padding: '14px', fontSize: '14px',
-                      fontWeight: 700, textDecoration: 'none',
+                      fontWeight: 700, textDecoration: 'none', textAlign: 'center',
                     }}>
                       Suscribirme al Plan Personal — $599/mes →
                     </a>
@@ -344,9 +421,10 @@ export default function SATstuto() {
             </div>
 
             <a href="mailto:contacto@satstuto.mx" style={{
-              display: 'block', width: '100%', background: '#00d4aa', color: '#000',
-              border: 'none', borderRadius: '10px', padding: '14px', fontSize: '14px',
-              fontWeight: 700, cursor: 'pointer', marginTop: '14px', textAlign: 'center', textDecoration: 'none',
+              display: 'block', background: '#00d4aa', color: '#000',
+              borderRadius: '10px', padding: '14px', fontSize: '14px',
+              fontWeight: 700, cursor: 'pointer', marginTop: '14px',
+              textAlign: 'center', textDecoration: 'none',
             }}>
               Quiero que el SAT no me sorprenda →
             </a>
