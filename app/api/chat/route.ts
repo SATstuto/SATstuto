@@ -7,11 +7,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Messages required' }, { status: 400 });
   }
 
+  // Fechas dinámicas — se actualizan solas cada año
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.toLocaleString('es-MX', { month: 'long' });
+  const ejercicio = now.getMonth() >= 3 ? year - 1 : year - 1; // Ejercicio fiscal siempre es año anterior hasta que cierre
+  const declaracionAnio = ejercicio;
+
   // CHAT LIBRE — responde preguntas fiscales, genera enganche, NO guía trámites
   const chatSystem = [
-    'Fecha actual: febrero 2026.',
-    'Ejercicio fiscal vigente: 2025.',
-    'Declaración anual 2025 se presenta en abril 2026.',
+    `Fecha actual: ${month} ${year}.`,
+    `Ejercicio fiscal vigente: ${ejercicio}.`,
+    `Declaración anual ${declaracionAnio} se presenta en abril ${year}.`,
+    `IMPORTANTE: El ejercicio fiscal que se declara es ${ejercicio}. Nunca menciones años incorrectos.`,
     '',
     'Eres el asesor fiscal digital de SATstuto. Experto en fiscal mexicano.',
     '',
@@ -64,9 +72,10 @@ export async function POST(req: NextRequest) {
 
   // COPILOTO — guía trámites paso a paso, analiza capturas
   const copilotoSystem = [
-    'Fecha actual: febrero 2026.',
-    'Ejercicio fiscal vigente: 2025.',
-    'Declaración anual 2025 se presenta en abril 2026.',
+    `Fecha actual: ${month} ${year}.`,
+    `Ejercicio fiscal vigente: ${ejercicio}.`,
+    `Declaración anual ${declaracionAnio} se presenta en abril ${year}.`,
+    `IMPORTANTE: El ejercicio fiscal que se declara es ${ejercicio}. Nunca menciones años incorrectos.`,
     '',
     'Eres el Copiloto SAT de SATstuto. Guías al usuario EN TIEMPO REAL dentro del portal SAT.',
     '',
@@ -87,7 +96,7 @@ export async function POST(req: NextRequest) {
     '',
     'TRÁMITES QUE DOMINAS:',
     '- Declaración mensual (pago provisional ISR, IVA)',
-    '- Declaración anual 2025 (personas físicas, todos los regímenes)',
+    `- Declaración anual ${declaracionAnio} (personas físicas, todos los regímenes)`,
     '- Constancia de situación fiscal',
     '- Opinión de cumplimiento',
     '- Actualización de obligaciones',
