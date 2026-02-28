@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 
 const QUICK_OPTIONS = [
+  { icon: '💰', text: '¿Y si el SAT te debe dinero a ti? Descubre si tienes saldo a favor.' },
   { icon: '😰', text: 'Llevo años sin declarar. ¿Qué me pasa si me regularizo?' },
   { icon: '📩', text: 'Me llegó carta del SAT. ¿Me van a multar?' },
   { icon: '💸', text: '¿Cómo pago menos impuestos sin hacer nada ilegal?' },
   { icon: '🏠', text: 'Tengo Airbnb o Uber. ¿El SAT ya sabe de mis ingresos?' },
-  { icon: '💰', text: 'Recibo efectivo y el SAT me está presionando. ¿Qué hago?' },
   { icon: '🏢', text: 'Soy dueño de negocio. ¿Cómo me pago sin que el SAT me cobre por todos lados?' },
   { icon: '📈', text: 'Tengo criptomonedas. ¿El SAT me puede cobrar impuestos?' },
   { icon: '🏡', text: 'Vendí mi casa. ¿Debo pagar ISR o hay forma legal de no pagar?' },
@@ -254,6 +254,25 @@ export default function SATstuto() {
         {/* HOME */}
         {view === 'home' && (
           <div>
+            {/* Banner devolución */}
+            <button onClick={() => startWith('¿Y si el SAT te debe dinero a ti? Soy asalariado y quiero saber si tengo saldo a favor.')} style={{
+              width: '100%', background: 'linear-gradient(135deg, #001a14 0%, #002a1f 100%)',
+              border: '1px solid #00d4aa', borderRadius: '12px',
+              padding: '16px', marginBottom: '12px', cursor: 'pointer',
+              textAlign: 'left', display: 'flex', alignItems: 'center', gap: '14px',
+            }}>
+              <span style={{ fontSize: '32px' }}>💰</span>
+              <div>
+                <div style={{ color: '#00d4aa', fontSize: '13px', fontWeight: 700, marginBottom: '3px' }}>
+                  ¿Y si el SAT te debe dinero a ti?
+                </div>
+                <div style={{ color: '#888', fontSize: '12px', lineHeight: '1.5' }}>
+                  Miles de personas tienen saldo a favor y nunca lo reclaman. Descubre si es tu caso.
+                </div>
+              </div>
+              <span style={{ color: '#00d4aa', fontSize: '18px', marginLeft: 'auto' }}>→</span>
+            </button>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
               {QUICK_OPTIONS.map((q) => (
                 <button key={q.text} onClick={() => startWith(q.text)} style={{
