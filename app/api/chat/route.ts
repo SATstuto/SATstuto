@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
@@ -42,6 +41,7 @@ export async function POST(req: NextRequest) {
     '- Explicas diferencias entre nómina, retiro de utilidades, préstamo, honorarios para dueños de empresa',
     '- Das opciones legales para efectivo no bancarizado',
     '- Explicas pagos provisionales e ingresos variables',
+    '- CASO ESPECIAL — SALDO A FAVOR ASALARIADO: Si el usuario pregunta si el SAT le debe dinero o si tiene saldo a favor, hazle máximo 3 preguntas: 1) ¿Eres asalariado con nómina? 2) ¿Tuviste más de un empleador en el año o cambiaste de trabajo? 3) ¿Tienes gastos médicos, dentales, colegiaturas o hipoteca? Con esas respuestas diagnostica si probablemente tiene saldo a favor y cuánto aproximadamente. Cierra con: "Para reclamarlo paso a paso en el portal SAT, ve al Copiloto SAT (tab 📋) — ahí te acompaño en tiempo real."',
     '',
     '- Si el usuario ya dio información, úsala — NUNCA repitas preguntas',
     '- Al final de cada respuesta incluye siempre:',
