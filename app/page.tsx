@@ -72,9 +72,7 @@ export default function SATstuto() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
   useEffect(() => { copilotoBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [copilotoMessages, copilotoLoading]);
-  useEffect(() => {
-    if (otroTramiteMode) otroInputRef.current?.focus();
-  }, [otroTramiteMode]);
+  useEffect(() => { if (otroTramiteMode) otroInputRef.current?.focus(); }, [otroTramiteMode]);
 
   const sendMessage = async (userText: string) => {
     if (!userText.trim() || loading) return;
@@ -176,7 +174,7 @@ export default function SATstuto() {
     setOtroTramiteInput('');
     const initialMsg: Message = {
       role: 'assistant',
-      content: `Listo, vamos a hacer tu ${tramite} juntos. 🎯\n\n¿Ya tienes el portal SAT abierto en otra ventana? Si es así dime qué ves en pantalla y te guío paso a paso.\n\nTambién puedes subir una captura 📸 de lo que ves y te digo exactamente qué hacer.`
+      content: `Listo, vamos a hacer tu ${tramite} juntos. 🎯\n\n¿Ya tienes el portal SAT abierto en otra ventana? Dime qué ves en pantalla y te guío paso a paso.\n\nTambién puedes subir una captura 📸 de lo que ves y te digo exactamente qué hacer.`
     };
     setCopilotoMessages([initialMsg]);
   };
@@ -254,8 +252,7 @@ export default function SATstuto() {
         {/* HOME */}
         {view === 'home' && (
           <div>
-            {/* Banner devolución */}
-            <button onClick={() => startWith('¿Y si el SAT te debe dinero a ti? Soy asalariado y quiero saber si tengo saldo a favor.')} style={{
+            <button onClick={() => startWith('¿Y si el SAT te debe dinero a ti? Quiero saber si tengo saldo a favor.')} style={{
               width: '100%', background: 'linear-gradient(135deg, #001a14 0%, #002a1f 100%)',
               border: '1px solid #00d4aa', borderRadius: '12px',
               padding: '16px', marginBottom: '12px', cursor: 'pointer',
@@ -333,11 +330,11 @@ export default function SATstuto() {
                   <div style={{ fontSize: '40px', marginBottom: '12px' }}>📋</div>
                   <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: 700, margin: '0 0 6px' }}>Copiloto SAT</h2>
                   <p style={{ color: '#888', fontSize: '13px', lineHeight: '1.6', margin: '0 0 8px' }}>
-                    Te guío en tiempo real en cualquier trámite del portal SAT.<br />
-                    Puedes subir capturas y te digo exactamente qué hacer.
+                    Te guío en tiempo real a presentar tus declaraciones y a cualquier trámite tributario.<br />
+                    Puedes escribirme y subir capturas — te digo exactamente qué hacer.
                   </p>
                   <div style={{ background: '#001a14', border: '1px solid #00d4aa', borderRadius: '8px', padding: '10px 14px', display: 'inline-block', marginBottom: '20px' }}>
-                    <span style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600 }}>3 consultas gratis antes de suscribirte</span>
+                    <span style={{ color: '#00d4aa', fontSize: '12px', fontWeight: 600 }}>Pruébalo gratis antes de suscribirte</span>
                   </div>
                 </div>
                 <p style={{ color: '#666', fontSize: '12px', marginBottom: '10px' }}>¿Qué trámite necesitas hacer?</p>
@@ -352,17 +349,13 @@ export default function SATstuto() {
                       {t.text}
                     </button>
                   ))}
-                  {/* Otro trámite */}
                   {!otroTramiteMode ? (
-                    <button
-                      onClick={() => setOtroTramiteMode(true)}
-                      style={{
-                        background: '#111', border: '1px dashed #333', borderRadius: '10px',
-                        padding: '12px', color: '#666', fontSize: '12px',
-                        cursor: 'pointer', textAlign: 'left', lineHeight: '1.5',
-                        gridColumn: TRAMITES.length % 2 === 0 ? '1 / -1' : 'auto',
-                      }}
-                    >
+                    <button onClick={() => setOtroTramiteMode(true)} style={{
+                      background: '#111', border: '1px dashed #333', borderRadius: '10px',
+                      padding: '12px', color: '#666', fontSize: '12px',
+                      cursor: 'pointer', textAlign: 'left', lineHeight: '1.5',
+                      gridColumn: TRAMITES.length % 2 === 0 ? '1 / -1' : 'auto',
+                    }}>
                       <span style={{ fontSize: '18px', display: 'block', marginBottom: '4px' }}>✏️</span>
                       Otro trámite...
                     </button>
@@ -381,10 +374,7 @@ export default function SATstuto() {
                           if (e.key === 'Escape') { setOtroTramiteMode(false); setOtroTramiteInput(''); }
                         }}
                         placeholder="Describe el trámite que necesitas..."
-                        style={{
-                          flex: 1, background: 'transparent', border: 'none',
-                          color: '#fff', fontSize: '13px', outline: 'none',
-                        }}
+                        style={{ flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', outline: 'none' }}
                       />
                       <button
                         onClick={() => otroTramiteInput.trim() && startCopiloto(otroTramiteInput.trim())}
