@@ -39,7 +39,6 @@ REGLAS:
 - Al final de cada respuesta incluye siempre:
   RIESGO: [riesgo activo específico detectado]
   ACCIÓN: [acción concreta con fecha límite]
-  ⚠️ Orientación informativa. SATstuto no se responsabiliza por decisiones sin validación profesional.`,
         messages,
       }),
     });
